@@ -1,6 +1,6 @@
 Name:		dnswl-client-scripts
 Version:	0.1.1
-Release:	%mkrel 1
+Release:	%mkrel 2
 Summary:	DNSWL client scripts
 License:	GPL
 Group:		Networking/Mail
