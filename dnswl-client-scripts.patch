@@ -1,0 +1,124 @@
+diff -p -up dnswl-client-scripts-0.1.1/dnswl.conf.orig dnswl-client-scripts-0.1.1/dnswl.conf
+--- dnswl-client-scripts-0.1.1/dnswl.conf.orig	2006-11-26 16:24:16.000000000 -0500
++++ dnswl-client-scripts-0.1.1/dnswl.conf	2008-09-15 06:01:59.000000000 -0400
+@@ -49,7 +49,8 @@ $bind_address='0.0.0.0';
+ # in order to profit from rsync's bandwidth-saving
+ # incremental transfer. However it's no disaster if
+ # the files get deleted. 
+-$tmpdir = '/tmp/';
++#$tmpdir = "$ENV{'HOME'}/tmp/";
++$tmpdir = "/var/cache/dnswl/";
+ 
+ 
+ # Verify authenticity of downloaded / rsynced
+@@ -80,7 +80,7 @@ $pgp = '/usr/bin/gpg';
+ 
+ #
+ # The base directory for all rbldnsd-related things.
+-$rbldnsd_base = '/opt/rbldnsd/';
++$rbldnsd_base = '/var/lib/rbldnsd/';
+ $rbldnsd_datadir = $rbldnsd_base . '/dnswl/';
+ $rbldnsd_filename = 'rbldnsd-dnswl';
+ 
+diff -p -up dnswl-client-scripts-0.1.1/postfix-update-dnswl.pl.orig dnswl-client-scripts-0.1.1/postfix-update-dnswl.pl
+--- dnswl-client-scripts-0.1.1/postfix-update-dnswl.pl.orig	2006-11-27 14:02:52.000000000 -0500
++++ dnswl-client-scripts-0.1.1/postfix-update-dnswl.pl	2008-09-15 05:49:48.000000000 -0400
+@@ -35,12 +35,17 @@ my @args = ();
+ if ($dnswl::postfix_getheader == 1) {
+ 	my $tmpfile = sprintf('%s/%s', $dnswl::tmpdir, $dnswl::headerfile);
+ 	my $outfile = sprintf('%s/%s', $dnswl::postfix_dir, $dnswl::headerfile);
++	my $signaturefile = sprintf('%s.asc', $dnswl::headerfile);
++
+ 	# 1. Get the file
+ 	if (!(rsync($dnswl::headerfile, $tmpfile) == 0)) {
+ 		print "rsync of dnswl.org data for Postfix (headerfile) failed\n";
+ 		exit 1;
+-	} else {
++	}
+ 
++	my $verify = verify($tmpfile, $signaturefile);
++
++	if ($verify == 1) {
+ 		# 2. Substitute 'REPLACEME' with $whitelistheader
+ 		if (length($dnswl::whitelistheader) > 0) {
+ 			print "Inserting $dnswl::whitelistheader\n" if ($dnswl::debug);
+@@ -55,18 +60,26 @@ if ($dnswl::postfix_getheader == 1) {
+ 			close(IN);
+ 			close(OUT);
+ 		}
+-	}		
++	} else {
++		print "PGP VERIFICATION FAILED!\n";
++		print "You may want to verify the data file: $tmpfile and the signature file: $signaturefile\n";
++		exit $verify;
++	}
+ }
+ 
+ if ($dnswl::postfix_getpermit == 1) {
+ 	my $tmpfile = sprintf('%s/%s', $dnswl::tmpdir, $dnswl::permitfile);
+ 	my $outfile = sprintf('%s/%s', $dnswl::postfix_dir, $dnswl::permitfile);
++	my $signaturefile = sprintf('%s.asc', $dnswl::permitfile);
+ 
+ 	# 1. Get the file
+ 	if (!(rsync($dnswl::permitfile, $tmpfile) == 0)) {
+ 		print "rsync of dnswl.org data for Postfix (permitfile) failed\n";
+-	} else {
++	}
+ 	
++	my $verify = verify($tmpfile, $signaturefile);
++
++	if ($verify == 1) {
+ 		# 2. Filter according to $permitregex
+ 		print "Applying $dnswl::permitregex to $dnswl::permitaction\n" if ($dnswl::debug);
+ 		open(IN, "$tmpfile") or die sprintf('Could not open %s for reading: %s', $tmpfile, $!);
+@@ -85,6 +98,10 @@ if ($dnswl::postfix_getpermit == 1) {
+ 		}
+ 		close(IN);
+ 		close(OUT);
++	} else {
++		print "PGP VERIFICATION FAILED!\n";
++		print "You may want to verify the data file: $tmpfile and the signature file: $signaturefile\n";
++		exit $verify;
+ 	}		
+ }
+ 
+diff -p -up dnswl-client-scripts-0.1.1/dnswl.sh.orig dnswl-client-scripts-0.1.1/dnswl.sh
+--- dnswl-client-scripts-0.1.1/dnswl.sh.orig	2006-11-26 15:35:32.000000000 -0500
++++ dnswl-client-scripts-0.1.1/dnswl.sh	2008-09-15 05:49:48.000000000 -0400
+@@ -13,13 +13,13 @@
+ #
+ 
+ # Path to dnswl-lib.pl
+-LIBPATH=/home/matthias/projects/dnswl/client-scripts
++LIBPATH=/usr/share/dnswl
+ 
+ # Path to the program files
+ PROGPATH=$LIBPATH
+ 
+ # Configuration file, fully qualified
+-CONFIG=/home/matthias/projects/dnswl/client-scripts/dnswl.conf
++CONFIG=/etc/dnswl.conf
+ 
+ # User to run as
+ USER=dnswl
+@@ -39,11 +39,11 @@ export PERL5LIB=$LIBPATH
+ 
+ case "$1" in
+ 	rbldnsd)
+-		su $USER -c $PROGPATH/rbldnsd-update-dnswl.pl $CONFIG
++		su $USER -s /bin/sh -c "$PROGPATH/rbldnsd-update-dnswl.pl $CONFIG"
+ 	;;
+ 	
+ 	postfix)
+-		su $USER -c $PROGPATH/postfix-update-dnswl.pl $CONFIG
++		su $USER -s /bin/sh -c "$PROGPATH/postfix-update-dnswl.pl $CONFIG"
+ 	;;
+ 
+ 	bind)
+@@ -56,4 +56,4 @@ case "$1" in
+ 	;;
+ esac
+ 
+-# EOF
+\ No newline at end of file
++# EOF
