@@ -4,7 +4,7 @@ Release:	%mkrel 3
 Summary:	DNSWL client scripts
 License:	GPL
 Group:		Networking/Mail
-URL:		http://www.dnswl.org
+URL:		https://www.dnswl.org
 Source:		http://downloads.sourceforge.net/dnswl/%{name}-%{version}.tar.gz
 Source1:	http://www.dnswl.org/pubkey.asc
 Source2:	dnswl.cron
